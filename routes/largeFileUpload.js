@@ -5,6 +5,7 @@ const path = require("path");
 
 // 文件保存路径
 const uploadPath = path.resolve(__dirname, '../upload')
+const uploadFileAll = path.resolve(__dirname, '../uploadAllFile')
 
 
 // 大文件上传-上传切片
@@ -14,9 +15,10 @@ router.post('/uploadBigFile', async (ctx, next) => {
     const chunkDir = path.resolve(uploadPath, fileName);
 
     // 切片目录不存在，创建切片目录
-    if (!fse.existsSync(chunkDir)) {
+    if (!fse.pathExists(chunkDir)) {
         await fse.mkdirs(chunkDir);
     }
+
     await fse.move(chunk.path, `${chunkDir}/${hash}`);
     ctx.body = {
         code: 200,
@@ -39,28 +41,37 @@ const writeFileStream = (path, writeStream) => {
 // 合成切片
 router.post('/mergeFileChunk', async (ctx, next) => {
     const { fileName, size } = ctx.request.body;
-    const chunkDir = path.resolve(uploadPath, fileName);
-    const chunkPaths = await fse.readdir(chunkDir);
-    const filePath = path.join(__dirname, `fileEnd/${fileName}`); //生成的文件名
+    const chunkDir = path.resolve(uploadPath, fileName); // 存放切片的文件
+    const chunkPaths = await fse.readdir(chunkDir); // 读取切片文件夹
     // 根据切片下标进行排序
     chunkPaths.sort((a, b) => a.split("-")[1] - b.split("-")[1]);
 
-    // await Promise.all(
-    //     // chunkPaths.map((chunkPath, index) => {
-    //     //     writeFileStream(
-    //     //         path.resolve(chunkDir, chunkPath),
-    //     //         fse.createWriteStream(chunkDir, {
-    //     //             start: index * size,
-    //     //             end: (index + 1) * size
-    //     //         })
-    //     //     )
-    //     // })
-    // )
+    // 附件目录不存在，创建切片目录
+    if (!fse.pathExists(uploadFileAll)) {
+        await fse.mkdirs(uploadFileAll);
+    }
+    const filePath = path.resolve(uploadFileAll, fileName); // 存放合并后的文件
+
+    await Promise.all(
+        chunkPaths.map((chunkPath, index) => {
+            writeFileStream(
+                path.resolve(chunkDir, chunkPath),
+                fse.createWriteStream(filePath, {
+                    start: index * size,
+                    end: (index + 1) * size
+                })
+            )
+        })
+    )
+
+    fse.remove(chunkDir); // 合并后删除保存切片的目录
 
     ctx.body = {
         code: 200,
-        msg: '合成切片123123'
+        msg: '合成切片成功',
+        filePath: filePath
     };
+
 })
 
 
