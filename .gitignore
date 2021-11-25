@@ -45,6 +45,8 @@ build/Release
 # Dependency directories
 node_modules/
 jspm_packages/
+
+# 自定义
 upload/
 uploadAllFile/
 
